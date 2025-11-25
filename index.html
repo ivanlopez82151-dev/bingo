@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bingo Web - Taller Hilos y Sockets</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #inicio {
+            margin-bottom: 20px;
+        }
+
+        input,
+        button {
+            padding: 8px 12px;
+            font-size: 16px;
+            margin: 5px;
+        }
+
+        #balota {
+            font-size: 24px;
+            color: #2c7;
+            margin: 15px 0;
+        }
+
+        #carton {
+            display: grid;
+            grid-template-columns: repeat(5, 60px);
+            gap: 4px;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+
+        .celda {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #333;
+            font-weight: bold;
+            background: white;
+        }
+
+        .free {
+            background: yellow !important;
+        }
+
+        .marcada {
+            background: lightgreen !important;
+        }
+
+        #mensaje {
+            font-size: 18px;
+            color: red;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🎉 Bingo en Línea</h1>
+    <div id="inicio">
+        <input type="text" id="nombre" placeholder="Ingresa tu nombre" maxlength="20" />
+        <button onclick="conectar()">Conectar al juego</button>
+    </div>
+    <div id="balota">Esperando conexión...</div>
+    <div id="carton"></div>
+    <div id="mensaje"></div>
+
+    <script>
+        let ws;
+        let carton = [];
+
+        function conectar() {
+            const nombre = document.getElementById("nombre").value.trim();
+            if (!nombre) {
+                alert("Por favor ingresa tu nombre.");
+                return;
+            }
+
+            // Usa la URL de tu app en Railway (¡cámbiala por la tuya!)
+            const wsUrl = "wss://bingo-production-e9c8.up.railway.app";
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                ws.send(JSON.stringify({ nombre }));
+            };
+
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                if (msg.tipo === "CARTON") {
+                    carton = msg.valor;
+                    dibujarCarton();
+                    document.getElementById("balota").innerText = "Juego iniciado. Esperando balotas...";
+                } else if (msg.tipo === "BALOTA") {
+                    document.getElementById("balota").innerText = "Balota: " + msg.valor;
+                    marcarNumero(msg.valor);
+                } else if (msg.tipo === "BINGO") {
+                    document.getElementById("mensaje").innerText = msg.mensaje;
+                    alert("¡FELICIDADES! " + msg.mensaje);
+                } else if (msg.tipo === "FIN") {
+                    document.getElementById("mensaje").innerText = msg.mensaje;
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error("Error WebSocket:", error);
+                document.getElementById("mensaje").innerText = "❌ Error al conectar con el servidor.";
+            };
+
+            ws.onclose = () => {
+                if (!document.getElementById("mensaje").innerText.includes("ganado")) {
+                    document.getElementById("mensaje").innerText = "⚠️ Conexión cerrada. Intenta nuevamente.";
+                }
+            };
+        }
+
+        function extraerNumero(balota) {
+            return parseInt(balota.substring(1));
+        }
+
+        function marcarNumero(balota) {
+            const num = extraerNumero(balota);
+            const celdas = document.querySelectorAll(".celda");
+            let idx = 0;
+            for (let col = 0; col < 5; col++) {
+                for (let fila = 0; fila < 5; fila++) {
+                    const valor = carton[col][fila];
+                    if (valor !== "FREE" && parseInt(valor) === num) {
+                        celdas[idx].classList.add("marcada");
+                    }
+                    idx++;
+                }
+            }
+        }
+
+        function dibujarCarton() {
+            const cont = document.getElementById("carton");
+            cont.innerHTML = "";
+            const letras = ["B", "I", "N", "G", "O"];
+            letras.forEach(letra => {
+                const c = document.createElement("div");
+                c.className = "celda";
+                c.innerText = letra;
+                cont.appendChild(c);
+            });
+            for (let col = 0; col < 5; col++) {
+                for (let fila = 0; fila < 5; fila++) {
+                    const c = document.createElement("div");
+                    c.className = "celda";
+                    const val = carton[col][fila];
+                    if (val === "FREE") {
+                        c.classList.add("free");
+                        c.innerText = "FREE";
+                    } else {
+                        c.innerText = val;
+                    }
+                    cont.appendChild(c);
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
