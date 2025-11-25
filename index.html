@@ -1,0 +1,145 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bingo Web</title>
+    <style>
+        body {
+            font-family: Arial;
+            text-align: center;
+            background: #f0f0f0;
+        }
+
+        #carton {
+            display: grid;
+            grid-template-columns: repeat(5, 60px);
+            gap: 4px;
+            margin: 20px auto;
+        }
+
+        .celda {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #333;
+            font-weight: bold;
+            background: white;
+        }
+
+        .free {
+            background: yellow !important;
+        }
+
+        .marcada {
+            background: lightgreen !important;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 10px;
+        }
+
+        #balota {
+            font-size: 24px;
+            color: green;
+            margin: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Bingo en Línea</h1>
+    <div>
+        <input type="text" id="nombre" placeholder="Tu nombre" maxlength="20" />
+        <button onclick="conectar()">Conectar</button>
+    </div>
+    <div id="balota">Esperando balota...</div>
+    <div id="carton"></div>
+    <div id="mensaje"></div>
+
+    <script>
+        let ws;
+        let carton = [];
+
+        function conectar() {
+            const nombre = document.getElementById("nombre").value.trim();
+            if (!nombre) { alert("Ingresa tu nombre"); return; }
+
+            // Usa wss:// si estás en Railway/Render con SSL
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const url = protocol + "//" + window.location.host + "/"; // Railway/Render usa el mismo host
+
+            ws = new WebSocket(url);
+            ws.onopen = () => {
+                ws.send(JSON.stringify({ nombre }));
+            };
+            ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                if (msg.tipo === "CARTON") {
+                    carton = msg.valor;
+                    dibujarCarton();
+                } else if (msg.tipo === "BALOTA") {
+                    document.getElementById("balota").innerText = "Balota: " + msg.valor;
+                    marcarNumero(msg.valor);
+                } else if (msg.tipo === "BINGO" || msg.tipo === "FIN") {
+                    document.getElementById("mensaje").innerHTML = `<h2 style="color:red;">${msg.mensaje}</h2>`;
+                    if (msg.tipo === "BINGO") alert("¡GANASTE!");
+                }
+            };
+            ws.onclose = () => {
+                document.getElementById("mensaje").innerHTML = "<p style='color:orange;'>Conexión perdida</p>";
+            };
+        }
+
+        function extraerNumero(balota) {
+            return parseInt(balota.substring(1));
+        }
+
+        function marcarNumero(balota) {
+            const num = extraerNumero(balota);
+            const celdas = document.querySelectorAll(".celda");
+            celdas.forEach((celda, idx) => {
+                const col = Math.floor(idx / 5);
+                const fila = idx % 5;
+                const valor = carton[col][fila];
+                if (valor !== "FREE" && parseInt(valor) === num) {
+                    celda.classList.add("marcada");
+                }
+            });
+        }
+
+        function dibujarCarton() {
+            const cont = document.getElementById("carton");
+            cont.innerHTML = "";
+            const letras = ["B", "I", "N", "G", "O"];
+            letras.forEach((letra, col) => {
+                const celda = document.createElement("div");
+                celda.className = "celda";
+                celda.innerText = letra;
+                cont.appendChild(celda);
+            });
+            for (let fila = 0; fila < 5; fila++) {
+                for (let col = 0; col < 5; col++) {
+                    const celda = document.createElement("div");
+                    celda.className = "celda";
+                    const val = carton[col][fila];
+                    if (val === "FREE") {
+                        celda.classList.add("free");
+                        celda.innerText = "FREE";
+                    } else {
+                        celda.innerText = val;
+                    }
+                    cont.appendChild(celda);
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
